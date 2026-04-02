@@ -31,30 +31,6 @@ class MiniFieldStorage(object):
         return StringIO(self.value)
 
 
-class FileFieldStorage(MiniFieldStorage):
-    """Like MiniFieldStorage, but for files."""
-
-    type = 'application/octet-stream'
-    type_options = {}
-    disposition = 'application/octet-stream'
-
-    def __init__(self, name, value, filename,
-            disposition, disposition_options, headers):
-        self.name = name
-        self.value = value
-        self.filename = filename
-        self.disposition = disposition
-        self.disposition_options = disposition_options
-        self.headers = headers
-
-    def __repr__(self):
-        return f"FileFieldStorage({self.name!r}, {self.value!r}, {self.filename!r})"
-
-    @property
-    def file(self):
-        return BytesIO(self.value)
-
-
 class FieldStorage(object):
     """Stores a sequence of fields from a form uploaded to
     a cgi script.
@@ -87,6 +63,16 @@ class FieldStorage(object):
         headers: email.message.Message containing all headers
     """
 
+    # Note: this class is used to represent both forms and files within
+    # the forms. (Probably a throwback to the way the original recursively
+    # parsed input or something like that.) Therefore, some of its fields
+    # are for forms, and some for files.
+
+    # Some of the fields never change, so we define them globally here
+    type = 'application/octet-stream'
+    type_options = {}
+    disposition = 'form-data'
+
     def __init__(self, fp=None, headers=None, outerboundary=b'',
                  environ=os.environ, keep_blank_values=0, strict_parsing=0,
                  limit=None, encoding='utf-8', errors='replace',
@@ -99,6 +85,25 @@ class FieldStorage(object):
         if headers is None:
             headers = {}
 
+        self.name = None
+        self.filename = None
+        self._form = None
+        self._value = None
+
+        # File values
+        if isinstance(fp, tuple):
+            # Kind of a kludge, but this is how we create a file item
+            # rather than a form
+            name,value,filename,disposition,disposition_options,headers = fp
+            self.name = name
+            self._value = value
+            self.filename = filename
+            self.disposition = disposition
+            self.disposition_options = disposition_options
+            self.headers = headers
+            return
+
+        # Form values
         self.encoding = encoding
         self.errors = errors
         self.bytes_read = 0
@@ -153,7 +158,7 @@ class FieldStorage(object):
                     disposition, disposition_options = parse_header(part['Content-Disposition'])
                     if 'name' in disposition_options:
                         # OK, it's a real field. Files get packed into
-                        # FileFieldStorage objects, everthing else is just
+                        # FieldStorage objects, everthing else is just
                         # a name:value pair.
                         name = disposition_options['name']
                         if name not in form: form[name] = []
@@ -163,8 +168,8 @@ class FieldStorage(object):
                         else:
                             value = part.get_payload(decode=True)
                             part_hdrs = dict(part.items())
-                            fs = FileFieldStorage(name, value, disposition_options['filename'],
-                                    disposition, disposition_options, part_hdrs)
+                            fs = FieldStorage((name, value, disposition_options['filename'],
+                                    disposition, disposition_options, part_hdrs))
                             form[name].append(fs)
 
         else:
@@ -196,14 +201,17 @@ class FieldStorage(object):
         pass
 
     def __repr__(self):
-        return f"FieldStorage(None, None, {self._form!r})"
+        if self._form:
+            return f"FieldStorage({self.name}, {self.filename}, {self._form!r})"
+        else:
+            return f"FieldStorage({self.name}, {self.filename}, {self.value!r})"
 
     def __getitems(self, key):
         """Internal: return the list of matching MiniFieldStorage items."""
         values = self._form[key]
         rval = []
         for value in values:
-            if isinstance(value, FileFieldStorage):
+            if isinstance(value, FieldStorage):
                 rval.append(value)
             else:
                 rval.append(MiniFieldStorage(key, value))
@@ -222,6 +230,8 @@ class FieldStorage(object):
     def value(self):
         """Return all values, as a list of MiniFieldStorage objects."""
         # What we return depends on what we contain
+        if self._value:
+            return self._value
         if self._form:
             rval = []
             for key in self._form.keys():
@@ -233,23 +243,33 @@ class FieldStorage(object):
             return rval
         return None
 
+    @property
+    def file(self):
+        return BytesIO(self.value)
+
+    @staticmethod
+    def __expandValue(value):
+        return value.value if isinstance(value, FieldStorage) else value
+
     def getvalue(self, key, default=None):
         """Return the value(s) for this key, as a singleton or a list"""
-        value = self._form[key]
-        if not value: return default
-        return value[0] if len(value) == 1 else value
+        values = self._form[key]
+        if not values: return default
+        values = list(map(FieldStorage.__expandValue, values))
+        return values[0] if len(values) == 1 else values
 
     def getfirst(self, key, default=None):
         """Return the first value for this key, as a singleton"""
         value = self._form[key]
         if not value: return default
-        return value[0]
+        return FieldStorage.__expandValue(value[0])
 
     def getlist(self, key, default=None):
         """Return the value(s) for this key, as a list"""
-        value = self._form[key]
-        if not value: return default
-        return value
+        values = self._form[key]
+        if not values: return default
+        values = list(map(FieldStorage.__expandValue, values))
+        return values
 
 
 # UTILITIES, use if you want
