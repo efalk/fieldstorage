@@ -92,3 +92,10 @@ new FieldStorage.
 
 The original seemed to append extra newlines to some header values. This version
 does not do that.
+
+# Notes
+
+The original FieldStorage stored all of its data in a list. This version uses
+a dict. Except for files, values are stored directly in the dict rather than in
+nested MiniFieldStorage objects. This causes subtle changes in how `repr()` and
+the `value` property behave.

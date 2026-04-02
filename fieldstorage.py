@@ -1,5 +1,7 @@
 """Meant to be a drop-in replacement for cgi.FieldStorage."""
 
+# See https://github.com/efalk/fieldstorage for current version.
+
 from email.message import Message
 import email.parser
 from io import BytesIO, StringIO
@@ -222,7 +224,7 @@ class FieldStorage(object):
     def __getitem__(self, key):
         rval = self.__getitems(key)
         if not rval:
-            raise KeyError(key)
+            raise KeyError(f"{key} not found")
         return rval[0] if len(rval) == 1 else rval
 
     def keys(self):
@@ -255,20 +257,20 @@ class FieldStorage(object):
 
     def getvalue(self, key, default=None):
         """Return the value(s) for this key, as a singleton or a list"""
-        values = self._form[key]
+        values = self._form.get(key)
         if not values: return default
         values = list(map(FieldStorage.__expandValue, values))
         return values[0] if len(values) == 1 else values
 
     def getfirst(self, key, default=None):
         """Return the first value for this key, as a singleton"""
-        value = self._form[key]
+        value = self._form.get(key)
         if not value: return default
         return FieldStorage.__expandValue(value[0])
 
     def getlist(self, key, default=None):
         """Return the value(s) for this key, as a list"""
-        values = self._form[key]
+        values = self._form.get(key)
         if not values: return default
         values = list(map(FieldStorage.__expandValue, values))
         return values
