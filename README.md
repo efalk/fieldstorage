@@ -47,10 +47,10 @@ Note that since HTML forms allow duplicate item names, each key in the FieldStor
 object may have multiple values. Depending on how you access the item, you may
 get a single value or a list of values.
 
-* fp — file-like object to be used for input (POST). Ignored by this implementation
+* fp — file-like object to be used for input (POST). Default is stdin.
 * headers — initial value for headers
-* outerbounds — ignored by this implementation
-* environ — environment variables
+* outerboundary — ignored by this implementation
+* environ — environment variables. Default is `os.environ`
 * keep_blank_values — passed to `urllib.parse.parse_qs()`
 * strict_parsing — passed to `urllib.parse.parse_qs()`
 * limit  — ignored by this implementation
@@ -60,6 +60,8 @@ get a single value or a list of values.
 * separator — passed to `urllib.parse.parse_qs()`
 
 ## Properties
+
+These are the properties when the FieldStorage object is used to hold a file.
 
 * name: name of the form field
 * value: the entire content of the item as bytes (file) or a string (everything else)
@@ -81,7 +83,7 @@ This is only useful if there's something in your application that was expecting 
 FileFieldStorage object, or a list of such objects if the key had multiple values.
 * getvalue(key) — Returns the underlying values rather than MiniFieldStorage objects. Returns a singleton or a list depending on whether there are multiple values for this key.
 * getfirst(key) — Returns the first value rather than a list
-* getlistt(key) — Returns a list of values, even if there's only one item
+* getlistt(key) — Returns a list of values, even if there's only one
 
 # Bugs
 

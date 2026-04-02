@@ -111,6 +111,8 @@ class FieldStorage(object):
         self.headers = headers
         self._items = []
 
+        if not fp: fp = sys.stdin
+
         # Programming note: I originally attempted to implement this with
         # a dict. That started to get complicated, and since the original just
         # used a list, I'm going to go with that.
@@ -149,7 +151,7 @@ class FieldStorage(object):
             parser = email.parser.BytesFeedParser()
             ct = 'Content-type: ' + environ.get('CONTENT_TYPE','') + '\r\n'
             parser.feed(ct.encode('utf-8'))
-            parser.feed(sys.stdin.buffer.read(content_len))
+            parser.feed(fp.buffer.read(content_len))
             message = parser.close()
             for part in message.walk():
                 if part.is_multipart():
@@ -176,7 +178,7 @@ class FieldStorage(object):
             # TODO: older servers might pass the query string in argv[1]; look
             # into handling that.
             if request_method == 'POST':
-                form = urllib.parse.parse_qs(sys.stdin.read(content_len),
+                form = urllib.parse.parse_qs(fp.read(content_len),
                     keep_blank_values=keep_blank_values,
                     strict_parsing=strict_parsing,
                     encoding=encoding, errors=errors,
